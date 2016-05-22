@@ -1,3 +1,8 @@
+Su 22-05-2016 | v-1.1
+- Fixed many bugs
+- Added unit tests
+- Added samples
+
 Su 22-05-2016 | v-1.0
 - Added support for string expressions
 - Added syntax error for unknown symbol

@@ -247,7 +247,7 @@ var Expression = (new (function() {
 
     function eval_num(e) {
       if(e.substr(0, 1) === '$')
-        return parts[e.substr(1)];
+        return ((['number', 'string']).indexOf(typeof parts[e.substr(1)]) !== -1) ? parts[e.substr(1)] : eval_str(parts[e.substr(1)]);
       else if(e.substr(0, 1) === '"' && e.substr(-1) === '"') {
         last_is_str = true;
         return e.substr(1, e.length - 2);
@@ -256,9 +256,9 @@ var Expression = (new (function() {
 
         if(Number.isNaN(a)) {
           // It's a name
-          if(vars.hasOwnProperty(e))
-            a = parseFloat(vars[e]);
-          else
+          if(vars.hasOwnProperty(e)) {
+            return parseFloat(vars[e]);
+          } else
             throw new Error('Variable doesn\'t exist : "' + e + '"');
         } else
           return a;
@@ -316,7 +316,7 @@ var Expression = (new (function() {
       if('+-'.indexOf(expr.numbers[i]) !== -1)
         operator = expr.numbers[i];
       else
-        left  = expr.strExp ? left + eval_num(expr.numbers[i]) : eval_str([left.toString(), operator, expr.numbers[i]]);
+        left = expr.strExp ? left + eval_num(expr.numbers[i]) : eval_str([left.toString(), operator, expr.numbers[i]]);
     }
 
     return expr.strExp ? left : eval_num(left.toString());
@@ -339,3 +339,6 @@ var Expression = (new (function() {
   };
 
 })());
+
+if(module.exports)
+  module.exports = Expression;
