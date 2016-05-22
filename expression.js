@@ -18,10 +18,50 @@ var Expression = (new (function() {
     expr = expr.replace(/ +/g, '') + '+0';
 
     var buffInt = '', buffDec = '', floating = false, operator = '', numbers = [], $ = -1, get, parts = [];
-    var char;
+    var char, p_buff = '', p_count = 0;
 
     for(var i = 0; i < expr.length; i++) {
       char = expr[i];
+
+      if(char === '(') {
+        if(buffInt || buffDec) {
+          //if(strict)
+            return _e('Opening parenthesis just after a number');
+          //else
+        }
+
+        if(!p_count)
+          p_buff = '';
+
+        p_count += 1;
+      } else if(char === ')') {
+        if(!p_count)
+          return _e('No parenthesis is opened');
+
+        p_count -= 1;
+
+        if(!p_count) {
+          if(p_buff) {
+            // parse content
+            parts.push(this.parse(p_buff.substr(1), strict));
+
+            if(parts[parts.length - 1] instanceof Error)
+              return parts[parts.length - 1];
+
+            buffInt = '$' + (++$);
+          } else if(strict)
+            return _e('No content between parenthesis');
+          else {
+            buffInt  = '0';
+            floating = false;
+          }
+        }
+      }
+
+      if(p_count) {
+        p_buff += char;
+        continue ;
+      }
 
       if('+-*/'.indexOf(char) !== -1) {
         // It's an operator
@@ -65,6 +105,9 @@ var Expression = (new (function() {
       }
     }
 
+    if(p_count)
+      return _e(p_count + ' parenthesis not closed');
+
     if(!buffInt)
       return _e('Missing number after operator');
 
@@ -101,8 +144,15 @@ var Expression = (new (function() {
 
     var parts = [];
 
-    for(var i = 0; i < expr.parts.length; i++)
-      parts.push(eval_str(expr.parts[i]));
+    for(var i = 0; i < expr.parts.length; i++) {
+      if(!Array.isArray(expr.parts[i])) {
+        parts.push(this.eval(expr.parts[i]));
+
+        if(parts[parts.length - 1] instanceof Error)
+          return parts[parts.length - 1];
+      } else
+        parts.push(eval_str(expr.parts[i]));
+    }
 
     var left = expr.numbers[0], right, operator;
 
@@ -116,7 +166,8 @@ var Expression = (new (function() {
       }
     }
 
-    return left;
+    // TODO: Remove the '+0' part
+    return eval_str([left.toString(), '+', '0']);
   };
 
   /**
