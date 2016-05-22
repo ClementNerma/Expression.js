@@ -11,23 +11,30 @@ var Expression = (new (function() {
   this.parse = function(expr, strict) {
     function _e(msg) {
       // TODO : Replace 'throw' by 'return'
-      throw new Error('At ' + i + ' : ' + msg);
+      throw new Error('At ' + i + ' : ' + msg + '\n' + expr.substr(Math.max(0, i - 5), i + 10) + '\n' + ' '.repeat(i - Math.max(0, i - 5)) + '^');
     }
 
     // TODO : Remove the '+0' part
-    expr = expr.replace(/ +/g, '') + '+0';
-
     var buffInt = '', buffDec = '', floating = false, operator = '', numbers = [], $ = -1, get, parts = [];
-    var char, p_buff = '', p_count = 0;
+    var char, p_buff = '', p_count = 0, buffLetter = '';
+
+    expr += '+0';
 
     for(var i = 0; i < expr.length; i++) {
       char = expr[i];
 
+      if(char === ' ')
+        continue ;
+
       if(char === '(') {
-        if(buffInt || buffDec) {
-          //if(strict)
-            return _e('Opening parenthesis just after a number');
-          //else
+        if(p_count) {
+          p_count += 1;
+          p_buff  += '(';
+          continue ;
+        }
+
+        if(buffInt || buffDec || buffLetter) {
+          return _e('Opening parenthesis just after a number');
         }
 
         if(!p_count)
@@ -52,8 +59,9 @@ var Expression = (new (function() {
           } else if(strict)
             return _e('No content between parenthesis');
           else {
-            buffInt  = '0';
-            floating = false;
+            buffInt    = '0';
+            buffLetter = '';
+            floating   = false;
           }
         }
       }
@@ -65,16 +73,16 @@ var Expression = (new (function() {
 
       if('+-*/'.indexOf(char) !== -1) {
         // It's an operator
-        if(!buffInt)
+        if(!buffInt && !buffLetter)
           return _e('Missing number before operator');
 
         if(floating && !buffDec)
           return _e('Missing decimal part of floating number');
 
         if(operator === '+' || operator === '-' || !operator)
-          numbers.push(!floating ? buffInt : buffInt + '.' + buffDec);
+          numbers.push(buffLetter || (!floating ? buffInt : buffInt + '.' + buffDec));
         else { // operator === '*' || operator === '/'
-          parts.push(numbers.splice(numbers.length - 2, 2).concat(!floating ? buffInt : buffInt + '.' + buffDec));
+          parts.push(numbers.splice(numbers.length - 2, 2).concat(buffLetter || (!floating ? buffInt : buffInt + '.' + buffDec)));
           numbers.push('$' + (++$));
         }
 
@@ -82,10 +90,14 @@ var Expression = (new (function() {
         operator = char;
 
         // Reset current number
-        buffInt  = '';
-        buffDec  = '';
-        floating = false;
+        buffInt    = '';
+        buffDec    = '';
+        buffLetter = '';
+        floating   = false;
       } else if('0123456789'.indexOf(char) !== -1) {
+        if(buffLetter)
+          return _e('Can\'t use numbers into a name');
+
         if(!floating)
           buffInt += char;
         else
@@ -93,6 +105,9 @@ var Expression = (new (function() {
       } else if(char === '.') {
         if(floating)
           return _e('Can\'t use two times the "." symbol in a number');
+
+        if(buffLetter)
+          return _e('Can\'t use the "." symbol after a name');
 
         if(!buffInt) {
           if(strict)
@@ -102,6 +117,11 @@ var Expression = (new (function() {
         }
 
         floating = true;
+      } else if('abcdefghijklmnopqrstuvwxyz'.indexOf(char) !== -1) {
+        if(buffInt)
+          return _e('Can\'t use letters into a number');
+
+        buffLetter += char;
       }
     }
 
@@ -122,15 +142,37 @@ var Expression = (new (function() {
   /**
     * Evaluate a parsed expression
     * @param {object} expr Parsed expresion from Expression.parse()
-    * @return {number|Error}
+    * @param {object} [vars] Variables
+    * @return {number}
     */
-  this.eval = function(expr) {
+  this.eval = function(expr, vars) {
     if(!expr || !Array.isArray(expr.numbers) || !Array.isArray(expr.parts))
-      return new Error('Bad parsed expression');
+      throw new Error('Bad parsed expression');
+
+    vars = vars || {};
+
+    function eval_num(e) {
+      var a;
+
+      if(e.substr(0, 1) === '$')
+        a = parts[e.substr(1)];
+      else {
+        a = parseFloat(e);
+
+        if(Number.isNaN(a)) {
+          // It's a name
+          if(vars.hasOwnProperty(e))
+            a = parseFloat(vars[e]);
+          else
+            throw new Error('Variable doesn\'t exist : "' + e + '"');
+        }
+      }
+
+      return a;
+    }
 
     function eval_str(expr) {
-      var a = (expr[0].substr(0, 1) === '$' ? parts[expr[0].substr(1)] : parseFloat(expr[0])),
-          b = (expr[2].substr(0, 1) === '$' ? parts[expr[2].substr(1)] : parseFloat(expr[2]));
+      var a = eval_num(expr[0]), b = eval_num(expr[2]);
 
       if(expr[1] === '+')
         return a + b;
@@ -173,15 +215,17 @@ var Expression = (new (function() {
   /**
     * Parse and evaluate an expression
     * @param {string} expr
+    * @param {object} [vars]
+    * @param {boolean} [strict]
     * @return {number|Error}
     */
-  this.exec = function(expr) {
-    var parsed = this.parse(expr);
+  this.exec = function(expr, vars, strict) {
+    var parsed = this.parse(expr, strict);
 
     if(parsed instanceof Error)
       return parsed;
 
-    return this.eval(parsed);
+    return this.eval(parsed, vars);
   };
 
 })());
