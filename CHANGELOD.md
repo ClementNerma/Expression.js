@@ -1,3 +1,7 @@
+Su 22-05-2016 | v-0.4
+- Added support of functions, including multi-levels calls
+- Fixed a bug with multi parenthesis
+
 Su 22-05-2016 | v-0.3
 - Added support for variables
 - Optimized errors display

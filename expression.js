@@ -16,7 +16,7 @@ var Expression = (new (function() {
 
     // TODO : Remove the '+0' part
     var buffInt = '', buffDec = '', floating = false, operator = '', numbers = [], $ = -1, get, parts = [];
-    var char, p_buff = '', p_count = 0, buffLetter = '';
+    var char, p_buff = '', p_count = 0, buffLetter = '', functionCall = null, functionIndex = 0, callBuffs = [], j;
 
     expr += '+0';
 
@@ -33,15 +33,45 @@ var Expression = (new (function() {
           continue ;
         }
 
-        if(buffInt || buffDec || buffLetter) {
+        if(buffInt || buffDec) {
           return _e('Opening parenthesis just after a number');
+        }
+
+        if(buffLetter) {
+          functionCall  = buffLetter;
+          functionIndex = p_count + 1;
         }
 
         if(!p_count)
           p_buff = '';
 
         p_count += 1;
+
+        if(p_count === 1)
+          continue ;
       } else if(char === ')') {
+        if(functionCall && p_count === functionIndex) {
+          callBuffs.push(p_buff);
+
+          for(j = 0; j < callBuffs.length; j++) {
+            get = this.parse(callBuffs[j], strict);
+
+            if(get instanceof Error)
+              return get;
+
+            callBuffs[j] = '$' + (++$);
+            parts.push(get);
+          }
+
+          parts.push({ function: functionCall, arguments: callBuffs });
+          functionCall = null;
+          buffInt      = '$' + (++$);
+          buffLetter   = '';
+          floating     = false;
+          p_count     -= 1;
+          continue ;
+        }
+
         if(!p_count)
           return _e('No parenthesis is opened');
 
@@ -50,7 +80,7 @@ var Expression = (new (function() {
         if(!p_count) {
           if(p_buff) {
             // parse content
-            parts.push(this.parse(p_buff.substr(1), strict));
+            parts.push(this.parse(p_buff, strict));
 
             if(parts[parts.length - 1] instanceof Error)
               return parts[parts.length - 1];
@@ -64,6 +94,10 @@ var Expression = (new (function() {
             floating   = false;
           }
         }
+      } else if(functionCall && char === ',') {
+        callBuffs.push(p_buff);
+        p_buff = '';
+        continue ;
       }
 
       if(p_count) {
@@ -184,14 +218,33 @@ var Expression = (new (function() {
         return a / b;
     }
 
-    var parts = [];
+    var parts = [], args, j, part;
 
     for(var i = 0; i < expr.parts.length; i++) {
       if(!Array.isArray(expr.parts[i])) {
-        parts.push(this.eval(expr.parts[i]));
+        if(expr.parts[i].function) {
+          // Function call
+          part = expr.parts[i];
 
-        if(parts[parts.length - 1] instanceof Error)
-          return parts[parts.length - 1];
+          if(!vars.hasOwnProperty(part.function))
+            throw new Error('Function "' + part.function + '" is not defined');
+
+          if(typeof vars[part.function] !== 'function')
+            throw new Error('"' + part.function + '" is not a function');
+
+          args = [];
+
+          for(j = 0; j < part.arguments.length; j++)
+            args.push(eval_num(part.arguments[j]));
+
+          parts.push(eval_num(vars[part.function].apply(vars, args).toString()));
+        } else {
+          // Sub-parsed expression
+          parts.push(this.eval(expr.parts[i], vars));
+
+          if(parts[parts.length - 1] instanceof Error)
+            return parts[parts.length - 1];
+        }
       } else
         parts.push(eval_str(expr.parts[i]));
     }
@@ -209,7 +262,7 @@ var Expression = (new (function() {
     }
 
     // TODO: Remove the '+0' part
-    return eval_str([left.toString(), '+', '0']);
+    return eval_num(left.toString());
   };
 
   /**
