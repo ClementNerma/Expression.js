@@ -1,3 +1,11 @@
+Su 22-05-2016 | v-1.0
+- Added support for string expressions
+- Added syntax error for unknown symbol
+- Optimized parsing for some expressions
+- Improved errors displaying
+- Fixed a display problem in errors
+- Fixed a display bug : Spaces were ignored
+
 Su 22-05-2016 | v-0.4
 - Added support of functions, including multi-levels calls
 - Fixed a bug with multi parenthesis
