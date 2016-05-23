@@ -50,7 +50,8 @@ var Expression = (new (function() {
           continue ;
       } else if(char === ')') {
         if(functionCall && p_count === functionIndex) {
-          callBuffs.push(p_buff);
+          if(p_buff) // Fix a bug when script calls a function without any argument
+            callBuffs.push(p_buff);
 
           for(j = 0; j < callBuffs.length; j++) {
             get = this.parse(callBuffs[j], strict, undefined, undefined, expr, i - p_buff.length);
@@ -203,20 +204,6 @@ var Expression = (new (function() {
         stringOpened = true;
         buffString   = '"';
 
-        /*// Fully optimized lines
-        stringOpened = !stringOpened;
-        buffString  += '"';
-
-        /* Not-optimized equivalent code :
-
-        if(stringOpened) {
-          stringOpened = false;
-          buffString  += '"';
-        } else {
-          stringOpened = true;
-          buffString   = '"';
-        }*/
-
         continue ;
       } else
         return _e('Syntax error : Unknown symbol');
@@ -237,13 +224,19 @@ var Expression = (new (function() {
     * Evaluate a parsed expression
     * @param {object} expr Parsed expresion from Expression.parse()
     * @param {object} [vars] Variables
+    * @param {boolean} [noLib] If set to true, won't include the main library functions (like cos, sin, round...). Default: false
     * @return {number}
     */
-  this.eval = function(expr, vars) {
+  this.eval = function(expr, vars, noLib) {
     if(!expr || !Array.isArray(expr.numbers) || !Array.isArray(expr.parts))
       throw new Error('Bad parsed expression');
 
     vars = vars || {};
+
+    if(!noLib) {
+      for(var i = 0; i < ExpressionLibraryKeys.length; i++)
+        vars[ExpressionLibraryKeys[i]] = ExpressionLibrary[ExpressionLibraryKeys[i]];
+    }
 
     function eval_num(e) {
       if(e.substr(0, 1) === '$')
@@ -297,7 +290,8 @@ var Expression = (new (function() {
           for(j = 0; j < part.arguments.length; j++)
             args.push(eval_num(part.arguments[j]));
 
-          parts.push(eval_num(vars[part.function].apply(vars, args).toString()));
+          //parts.push(eval_num(vars[part.function].apply(vars, args).toString()));
+          parts.push(vars[part.function].apply(vars, args));
         } else {
           // Sub-parsed expression
           parts.push(this.eval(expr.parts[i], vars));
@@ -327,9 +321,10 @@ var Expression = (new (function() {
     * @param {string} expr
     * @param {object} [vars]
     * @param {boolean} [strict]
+    * @param {boolean} [noLib]
     * @return {number|Error}
     */
-  this.exec = function(expr, vars, strict) {
+  this.exec = function(expr, vars, strict, noLib) {
     var parsed = this.parse(expr, strict);
 
     if(parsed instanceof Error)
@@ -340,5 +335,43 @@ var Expression = (new (function() {
 
 })());
 
-if(module.exports)
+var ExpressionLibrary = {
+  abs   : function(n) { return Math.abs(n); },
+  acos  : function(n) { return Math.acos(n); },
+  acosh : function(n) { return Math.acosh(n); },
+  asin  : function(n) { return Math.asin(n); },
+  asinh : function(n) { return Math.asinh(n); },
+  atan  : function(n) { return Math.atan(n); },
+  atan2 : function(n) { return Math.atan2(n); },
+  atanh : function(n) { return Math.atanh(n); },
+  cbrt  : function(n) { return Math.cbrt(n); },
+  ceil  : function(n) { return Math.ceil(n); },
+  cos   : function(n) { return Math.cos(n); },
+  cosh  : function(n) { return Math.cosh(n); },
+  floor : function(n) { return Math.floor(n); },
+  log   : function(n) { return Math.log(n); },
+  log10 : function(n) { return Math.log10(n); },
+  log1p : function(n) { return Math.log1p(n); },
+  log2  : function(n) { return Math.log2(n); },
+  random: function(n) { return Math.random(); },
+  sign  : function(n) { return Math.sign(n); },
+  sin   : function(n) { return Math.sin(n); },
+  sinh  : function(n) { return Math.sinh(n); },
+  sqrt  : function(n) { return Math.sqrt(n); },
+  tan   : function(n) { return Math.tan(n); },
+  tanh  : function(n) { return Math.tanh(n); },
+  trunc : function(n) { return Math.trunc(n); },
+  max   : function(n1, n2) { return n1 > n2 ? n1 : n2; },
+  min   : function(n1, n2) { return n1 < n2 ? n1 : n2 },
+  pow   : function(n, pow) { return Math.pow(n, pow); },
+
+  // Added features
+  randomInt : function(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; },
+  randomBool: function() { return (Math.random() > 0.5) ? 1 : 0; },
+  substr    : function(str, min, max) { return '"' + ((typeof max !== 'undefined') ? str.substr(min, max) : str.substr(min)) + '"'; },
+  uppercase : function(str) { return '"' + str.toLocaleUpperCase() + '"'; },
+  lowercase : function(str) { return '"' + str.toLocaleLowerCase() + '"'; }
+}, ExpressionLibraryKeys = Object.keys(ExpressionLibrary);
+
+if(typeof module === 'object' && typeof module.exports === 'object')
   module.exports = Expression;

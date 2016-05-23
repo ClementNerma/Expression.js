@@ -1,3 +1,9 @@
+Su 22-05-2016 | v-1.2
+- Added expression library
+- Fixed a bug when calling a function without any argument
+- Fixed a bug when a function was returning a string
+- Fixed a critical with `module` usage (script was working but a fatal error was thrown)
+
 Su 22-05-2016 | v-1.1
 - Fixed many bugs
 - Added unit tests
