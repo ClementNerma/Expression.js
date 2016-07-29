@@ -1,6 +1,6 @@
 'use strict';
 
-var Expression = (new (function() {
+let Expression = (new (function() {
 
   /**
     * Parse an expression
@@ -10,19 +10,17 @@ var Expression = (new (function() {
     */
   this.parse = function(expr, strict, numExp, strExp, fullExpr, startI) {
     function _e(msg) {
-      var k = i + (startI || -1) + 1; // 'i' starts from 0
+      let k = i + (startI || -1) + 1; // 'i' starts from 0
       return new Error('At column ' + k + ' : ' + msg + '\n' + (fullExpr || expr).substr(0, (fullExpr || expr).length - 1).substr(Math.max(0, k - 25), k + 25) + '\n' + ' '.repeat(k - Math.max(0, k - 25)) + '^');
     }
 
-    var buffInt = '', buffDec = '', floating = false, operator = '', numbers = [], $ = -1, get, parts = [];
-    var char, p_buff = '', p_count = 0, buffLetter = '', functionCall = null, functionIndex = 0, callBuffs = [], j,
+    let buffInt = '', buffDec = '', floating = false, operator = '', numbers = [], $ = -1, get, parts = [];
+    let char, p_buff = '', p_count = 0, buffLetter = '', functionCall = null, functionIndex = 0, callBuffs = [], j,
         buffString = '', stringOpened = false;
 
     expr += '+';
 
-    for(var i = 0; i < expr.length; i++) {
-      char = expr[i];
-
+    for(let char of expr) {
       if(char === '(') {
         if(p_count) {
           p_count += 1;
@@ -53,17 +51,19 @@ var Expression = (new (function() {
           if(p_buff) // Fix a bug when script calls a function without any argument
             callBuffs.push(p_buff);
 
-          for(j = 0; j < callBuffs.length; j++) {
-            get = this.parse(callBuffs[j], strict, undefined, undefined, expr, i - p_buff.length);
+          let i = 0;
+
+          for(let buff of callBuffs) {
+            get = this.parse(buff, strict, undefined, undefined, expr, ++i - p_buff.length);
 
             if(get instanceof Error)
               return get;
 
-            if(get.numbers.length === 1 && get.numbers[0].substr(0, 1) !== '$')
+            if(get.numbers.length === 1 && !get.numbers[0].startsWith('$'))
               // Optimization
-              callBuffs[j] = get.numbers[0];
+              buff = get.numbers[0];
             else {
-              callBuffs[j] = '$' + (++$);
+              buff = '$' + (++$);
               parts.push(!get.parts.length ? get.numbers : get);
             }
           }
@@ -90,7 +90,7 @@ var Expression = (new (function() {
             if(get instanceof Error)
               return get;
 
-            if(get.numbers.length === 1 && get.numbers[0].substr(0, 1) !== '$')
+            if(get.numbers.length === 1 && !get.numbers[0].startsWith('$'))
               // Optimization
               buffInt = get.numbers[0];
             else {
@@ -214,7 +214,7 @@ var Expression = (new (function() {
 
     numbers.push(!floating ? buffInt : buffInt + '.' + buffDec);
 
-    var ret = {numbers: numbers.slice(0, numbers.length - 2), parts: parts};
+    let ret = {numbers: numbers.slice(0, numbers.length - 2), parts: parts};
     if(strExp) ret.strExp = true;
 
     return ret;
@@ -234,18 +234,18 @@ var Expression = (new (function() {
     vars = vars || {};
 
     if(!noLib) {
-      for(var i = 0; i < ExpressionLibraryKeys.length; i++)
-        vars[ExpressionLibraryKeys[i]] = ExpressionLibrary[ExpressionLibraryKeys[i]];
+      for(let key of ExpressionLibraryKeys)
+        vars[key] = ExpressionLibrary[key];
     }
 
     function eval_num(e) {
-      if(e.substr(0, 1) === '$')
+      if(e.startsWith('$'))
         return ((['number', 'string']).indexOf(typeof parts[e.substr(1)]) !== -1) ? parts[e.substr(1)] : eval_str(parts[e.substr(1)]);
-      else if(e.substr(0, 1) === '"' && e.substr(-1) === '"') {
+      else if(e.startsWith('"') && e.endsWith('"')) {
         last_is_str = true;
         return e.substr(1, e.length - 2);
       } else {
-        var a = parseFloat(e);
+        let a = parseFloat(e);
 
         if(Number.isNaN(a)) {
           // It's a name
@@ -259,7 +259,7 @@ var Expression = (new (function() {
     }
 
     function eval_str(expr) {
-      var a = eval_num(expr[0]), b = eval_num(expr[2]);
+      let a = eval_num(expr[0]), b = eval_num(expr[2]);
 
       if(expr[1] === '+')
         return a + b;
@@ -271,13 +271,13 @@ var Expression = (new (function() {
         return a / b;
     }
 
-    var parts = [], args, j, part, last_is_str;
+    let parts = [], args, part, last_is_str;
 
-    for(var i = 0; i < expr.parts.length; i++) {
-      if(!Array.isArray(expr.parts[i])) {
-        if(expr.parts[i].function) {
+    for(let part of expr.parts) {
+      if(!Array.isArray(part)) {
+        if(part.function) {
           // Function call
-          part = expr.parts[i];
+          part = part;
 
           if(!vars.hasOwnProperty(part.function))
             throw new Error('Function "' + part.function + '" is not defined');
@@ -287,26 +287,26 @@ var Expression = (new (function() {
 
           args = [];
 
-          for(j = 0; j < part.arguments.length; j++)
+          for(let j = 0; j < part.arguments.length; j++)
             args.push(eval_num(part.arguments[j]));
 
           //parts.push(eval_num(vars[part.function].apply(vars, args).toString()));
           parts.push(vars[part.function].apply(vars, args));
         } else {
           // Sub-parsed expression
-          parts.push(this.eval(expr.parts[i], vars));
+          parts.push(this.eval(part, vars));
 
           if(parts[parts.length - 1] instanceof Error)
             return parts[parts.length - 1];
         }
       } else
-        parts.push(eval_str(expr.parts[i]));
+        parts.push(eval_str(part));
     }
 
-    var left = eval_num(expr.numbers[0]), operator;
+    let left = eval_num(expr.numbers[0]), operator;
 
     // NOTE : Here all operations are just '+' (add) or '-' (sub)
-    for(i = 1; i < expr.numbers.length; i++) {
+    for(let i = 1; i < expr.numbers.length; i++) {
       if('+-'.indexOf(expr.numbers[i]) !== -1)
         operator = expr.numbers[i];
       else
@@ -325,7 +325,7 @@ var Expression = (new (function() {
     * @return {number|Error}
     */
   this.exec = function(expr, vars, strict, noLib) {
-    var parsed = this.parse(expr, strict);
+    let parsed = this.parse(expr, strict);
 
     if(parsed instanceof Error)
       return parsed;
@@ -335,7 +335,7 @@ var Expression = (new (function() {
 
 })());
 
-var ExpressionLibrary = {
+let ExpressionLibrary = {
   abs   : function(n) { return Math.abs(n); },
   acos  : function(n) { return Math.acos(n); },
   acosh : function(n) { return Math.acosh(n); },

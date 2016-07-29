@@ -1,3 +1,6 @@
+Fr 29-07-2016 | v-1.2-a
+- Adapted to ES6 syntax [Improved performance a little]
+
 Su 22-05-2016 | v-1.2
 - Added expression library
 - Fixed a bug when calling a function without any argument
